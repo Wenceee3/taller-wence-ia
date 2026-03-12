@@ -1,132 +1,105 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Send, Bot, User } from 'lucide-react';
 
-// Tu API Key de Google AI Studio
-const genAI = new GoogleGenerativeAI("AIzaSyBwNkt4pZkPyQ9e053PunL12Pw2eWs08AM");
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_KEY);
 
 function ContactoIA({ stats }) {
-  const [nombre, setNombre] = useState('');
   const [mensaje, setMensaje] = useState('');
-  const [respuestaBot, setRespuestaBot] = useState('');
+  const [chat, setChat] = useState([
+    { role: 'bot', text: '¡Hola! Soy el asistente del Taller Wence. ¿En qué puedo ayudarte hoy?' }
+  ]);
   const [cargando, setCargando] = useState(false);
+  const scrollRef = useRef(null);
+
+  // Auto-scroll al último mensaje
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chat]);
 
   const enviarMensaje = async (e) => {
     e.preventDefault();
+    if (!mensaje.trim()) return;
+
+    const nuevoMensajeUsuario = { role: 'user', text: mensaje };
+    setChat(prev => [...prev, nuevoMensajeUsuario]);
+    setMensaje('');
     setCargando(true);
-    setRespuestaBot("");
 
     try {
-      // CAMBIO AQUÍ: Forzamos el modelo con el prefijo "models/" que es lo que pide la API v1beta
-    const model = genAI.getGenerativeModel({ model: "models/gemini-1.5-flash" }, { apiVersion: 'v1beta' });
-      
-      const prompt = `Eres el asistente virtual del Taller Wence. 
-      Datos: ${stats.total} presupuestos, ${stats.dinero}€ facturados.
-      Cliente: ${nombre}. Mensaje: ${mensaje}. 
-      Responde amable y breve.`;
+      const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+      const prompt = `Eres el asistente del Taller Wence. Datos taller: ${stats.total} trabajos, ${stats.dinero}€ facturados. El usuario dice: ${mensaje}. Responde corto y amable.`;
 
-      // CAMBIO AQUÍ: Usamos un formato de objeto más explícito para la petición
-      const result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-      });
-      
-      const response = await result.response;
-      const textoIA = response.text();
+      const result = await model.generateContent(prompt);
+      const respuestaIA = result.response.text();
 
-      setRespuestaBot(textoIA);
+      setChat(prev => [...prev, { role: 'bot', text: respuestaIA }]);
 
-      // Guardado en Firebase (esto ya te funcionaba)
+      // Guardar en Firebase
       await addDoc(collection(db, "conversations"), {
-        nombreCliente: nombre,
-        mensajeOriginal: mensaje,
-        respuestaIA: textoIA,
-        fecha: serverTimestamp(),
-        estado: "ATENDIDO_POR_IA"
+        mensaje: mensaje,
+        respuesta: respuestaIA,
+        fecha: serverTimestamp()
       });
 
     } catch (error) {
-      console.error("Error detallado:", error);
-      // Si falla, mostramos el error real en el chat para saber qué pasa
-      setRespuestaBot("Error de conexión: " + (error.message || "Revisa la consola"));
+      setChat(prev => [...prev, { role: 'bot', text: 'Lo siento, he tenido un problema técnico. ¿Podemos intentarlo de nuevo?' }]);
     }
     setCargando(false);
   };
 
-  // Estilos constantes para los inputs
-  const inputStyle = { 
-    width: '100%', 
-    padding: '12px', 
-    margin: '10px 0', 
-    borderRadius: '8px', 
-    border: '1px solid #ddd',
-    backgroundColor: 'white',
-    color: '#333',
-    fontSize: '16px'
-  };
-
-  const btnStyle = { 
-    width: '100%', 
-    padding: '15px', 
-    backgroundColor: '#eab308', 
-    color: '#003366',
-    border: 'none', 
-    borderRadius: '8px', 
-    fontWeight: 'bold', 
-    fontSize: '18px',
-    cursor: 'pointer',
-    marginTop: '10px'
-  };
-
   return (
-    <div style={{ backgroundColor: '#003366', padding: '50px', borderRadius: '20px', color: 'white', display: 'flex', gap: '40px', flexWrap: 'wrap' }}>
-      
-      {/* Columna Izquierda: Información de contacto */}
-      <div style={{ flex: '1', minWidth: '300px' }}>
-        <h2 style={{ fontSize: '32px', marginBottom: '20px' }}>Taller Wence</h2>
-        <div style={{ background: 'white', color: '#333', padding: '25px', borderRadius: '15px', marginBottom: '25px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-          <h3 style={{ marginTop: 0 }}>📍 Dirección</h3>
-          <p style={{ fontSize: '18px', margin: 0 }}>Avenida de la Constitución, 15<br/>Valdepeñas de Jaén</p>
+    <div className="bg-slate-900 rounded-3xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col h-[600px]">
+      {/* Cabecera */}
+      <div className="bg-slate-800 p-4 border-b border-slate-700 flex items-center gap-3">
+        <div className="bg-sky-500 p-2 rounded-full">
+          <Bot size={20} className="text-white" />
         </div>
+        <div>
+          <h3 className="text-white font-bold text-sm">Asistente Taller Wence</h3>
+          <p className="text-emerald-400 text-xs flex items-center gap-1">
+            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span> En línea
+          </p>
+        </div>
+      </div>
 
-        {respuestaBot && (
-          <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '25px', borderRadius: '15px', borderLeft: '8px solid #0ea5e9', animation: 'fadeIn 0.5s' }}>
-            <strong style={{ fontSize: '20px' }}>🤖 Asistente IA:</strong>
-            <p style={{ fontSize: '18px', lineHeight: '1.5', marginTop: '10px' }}>{respuestaBot}</p>
+      {/* Cuerpo del Chat */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
+        {chat.map((msg, i) => (
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-md ${
+              msg.role === 'user' 
+                ? 'bg-sky-600 text-white rounded-tr-none' 
+                : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'
+            }`}>
+              {msg.text}
+            </div>
+          </div>
+        ))}
+        {cargando && (
+          <div className="flex justify-start">
+            <div className="bg-slate-800 p-3 rounded-2xl rounded-tl-none border border-slate-700 italic text-slate-400 text-xs">
+              Escribiendo...
+            </div>
           </div>
         )}
+        <div ref={scrollRef} />
       </div>
 
-      {/* Columna Derecha: Formulario */}
-      <div style={{ flex: '1', minWidth: '350px', background: '#f8fafc', padding: '40px', borderRadius: '15px', color: '#333' }}>
-        <h2 style={{ color: '#003366', marginTop: 0 }}>Inicia una Conversación</h2>
-        <p style={{ color: '#64748b', marginBottom: '20px' }}>Cuéntanos qué necesita tu vehículo y nuestra IA te responderá al instante.</p>
-        
-        <form onSubmit={enviarMensaje}>
-          <label style={{ fontWeight: 'bold' }}>Tu Nombre completo*</label>
-          <input 
-            style={inputStyle} 
-            placeholder="Ej. Juan Pérez"
-            value={nombre} 
-            onChange={e => setNombre(e.target.value)} 
-            required 
-          />
-          
-          <label style={{ fontWeight: 'bold' }}>¿En qué podemos ayudarte?*</label>
-          <textarea 
-            style={inputStyle} 
-            placeholder="Escribe tu mensaje aquí..."
-            rows="5" 
-            value={mensaje} 
-            onChange={e => setMensaje(e.target.value)} 
-            required 
-          />
-          
-          <button type="submit" style={btnStyle} disabled={cargando}>
-            {cargando ? '🔄 Procesando con IA...' : 'Enviar Mensaje'}
-          </button>
-        </form>
-      </div>
+      {/* Input */}
+      <form onSubmit={enviarMensaje} className="p-4 bg-slate-800 border-t border-slate-700 flex gap-2">
+        <input 
+          className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white outline-none focus:border-sky-500 transition-all"
+          placeholder="Escribe tu duda aquí..."
+          value={mensaje}
+          onChange={(e) => setMensaje(e.target.value)}
+        />
+        <button type="submit" className="bg-sky-600 hover:bg-sky-500 p-2 rounded-xl text-white transition-colors">
+          <Send size={20} />
+        </button>
+      </form>
     </div>
   );
 }

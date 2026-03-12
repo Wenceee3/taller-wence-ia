@@ -6,6 +6,7 @@ import { Wrench, Wallet, TrendingUp } from 'lucide-react';
 
 import ContactoIA from './components/ContactoIA';
 import GeneradorFacturas from './components/GeneradorFacturas';
+import AnalizadorFacturas from './components/AnalizadorFacturas';
 
 function App() {
   const [stats, setStats] = useState({ total: 0, dinero: 0 });
@@ -13,19 +14,6 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-
-    const checkModels = async () => {
-    try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=TU_API_KEY`);
-      const data = await response.json();
-      console.log("Modelos disponibles para mi clave:", data);
-    } catch (e) {
-      console.error("Error al listar modelos:", e);
-    }
-  };
-  checkModels();
-
-
     const fetchData = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, "presupuestos"));
@@ -34,19 +22,18 @@ function App() {
         
         querySnapshot.forEach((doc) => {
           const data = doc.data();
-          const precioNum = parseFloat(data.precio) || 0; 
-          sumaDinero += precioNum;
+          sumaDinero += parseFloat(data.precio) || 0;
           contador++;
         });
 
         setStats({ total: contador, dinero: sumaDinero });
         setDataGrafica([
-          { name: 'Presupuestos', valor: contador },
-          { name: 'Facturación (€)', valor: sumaDinero }
+          { name: 'Trabajos', valor: contador },
+          { name: 'Euros (€)', valor: sumaDinero }
         ]);
         setLoading(false);
       } catch (error) {
-        console.error("Error al leer Firebase: ", error);
+        console.error("Error Firebase:", error);
         setLoading(false);
       }
     };
@@ -54,71 +41,64 @@ function App() {
   }, []);
 
   if (loading) return (
-    <div className="loading-screen">
-      <div className="spinner"></div>
-      <p>Cargando datos del taller...</p>
+    <div className="flex flex-col items-center justify-center h-screen bg-[#0f172a] text-white">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-sky-400 mb-4"></div>
+      <p className="text-lg font-medium">Sincronizando con Taller Wence...</p>
     </div>
   );
 
   return (
-    <div className="main-container">
-      <header className="main-header">
-        <h1>🛠️ Taller Wence <span>| Panel DAW</span></h1>
+    <div className="min-h-screen bg-[#0f172a] text-slate-200 p-4 md:p-10 font-sans">
+      <header className="border-b border-slate-700 pb-6 mb-8">
+        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+          🛠️ Taller Wence <span className="text-sm font-normal text-slate-400">| Panel de Gestión v1.0</span>
+        </h1>
       </header>
       
-      {/* Sección 1: KPIs (Tarjetas) */}
-      <section className="stats-grid">
-        <StatCard icon={<Wrench size={40} />} title={stats.total} label="Trabajos" color="#38bdf8" />
-        <StatCard icon={<Wallet size={40} />} title={`${stats.dinero.toLocaleString()} €`} label="Ingresos" color="#10b981" />
-        <StatCard icon={<TrendingUp size={40} />} title="Activo" label="Servicio" color="#eab308" />
+      {/* KPIs */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <StatCard icon={<Wrench size={32} />} title={stats.total} label="Trabajos Realizados" color="text-sky-400" />
+        <StatCard icon={<Wallet size={32} />} title={`${stats.dinero.toLocaleString()} €`} label="Facturación Total" color="text-emerald-400" />
+        <StatCard icon={<TrendingUp size={32} />} title="Activo" label="Estado del Servidor" color="text-yellow-500" />
       </section>
 
-      {/* Sección 2: Gráfica */}
-      <section className="content-block">
-        <h2>📊 Rendimiento del Negocio</h2>
-        <div style={{ width: '100%', height: 300 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={dataGrafica}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-              <XAxis dataKey="name" stroke="#94a3b8" />
-              <YAxis stroke="#94a3b8" />
-              <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
-              <Bar dataKey="valor" fill="#38bdf8" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </section>
+  {/* Sección de Gráfica */}
+<div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700 h-[400px] w-full mb-10">
+  <h2 className="text-xl font-bold mb-4 text-white">📊 Rendimiento Económico</h2>
+  <div className="h-[300px] w-full"> 
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={dataGrafica}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+        <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
+        <YAxis stroke="#94a3b8" fontSize={12} />
+        <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '10px' }} />
+        <Bar dataKey="valor" fill="#38bdf8" radius={[6, 6, 0, 0]} barSize={60} />
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</div>
 
-      {/* Sección 3: Facturación (El nuevo componente) */}
-      <section className="content-block">
+{/* Sección de Analizador de Facturas independiente */}
+<div className="mb-10">
+  <AnalizadorFacturas />
+</div>
+
+      {/* Facturación y Chat */}
+      <div className="space-y-10">
         <GeneradorFacturas />
-      </section>
-
-      {/* Sección 4: Chat IA */}
-      <section className="content-block">
         <ContactoIA stats={stats} />
-      </section>
-
-      <style>{`
-        .main-container { padding: 40px; background-color: #0f172a; min-height: 100vh; color: white; font-family: sans-serif; }
-        .main-header { border-bottom: 1px solid #334155; margin-bottom: 30px; padding-bottom: 20px; }
-        .main-header h1 span { font-size: 16px; color: #94a3b8; font-weight: normal; }
-        .stats-grid { display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
-        .content-block { background: #1e293b; padding: 30px; border-radius: 20px; border: 1px solid #334155; margin-bottom: 30px; }
-        .loading-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #0f172a; color: white; }
-      `}</style>
+      </div>
     </div>
   );
 }
 
-// Un pequeño sub-componente interno para no repetir código de tarjetas
 function StatCard({ icon, title, label, color }) {
   return (
-    <div style={{ background: '#1e293b', padding: '20px', borderRadius: '15px', flex: 1, minWidth: '200px', display: 'flex', alignItems: 'center', gap: '15px', border: '1px solid #334155' }}>
-      <div style={{ color }}>{icon}</div>
+    <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700 flex items-center gap-5 hover:border-slate-500 transition-colors shadow-lg">
+      <div className={`${color} bg-slate-900/50 p-4 rounded-xl`}>{icon}</div>
       <div>
-        <h3 style={{ margin: 0, fontSize: '24px' }}>{title}</h3>
-        <p style={{ margin: 0, color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase' }}>{label}</p>
+        <h3 className="text-3xl font-bold text-white">{title}</h3>
+        <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">{label}</p>
       </div>
     </div>
   );
