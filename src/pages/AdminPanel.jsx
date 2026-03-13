@@ -3,6 +3,8 @@ import { db } from '../services/firebase'; // Asegúrate de que hay ../
 import { collection, getDocs } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Wrench, Wallet, TrendingUp, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { auth } from '../services/firebase';
 
 // Aquí está el truco: hay que subir un nivel para encontrar components
 import GeneradorFacturas from '../components/GeneradorFacturas';
@@ -12,6 +14,15 @@ function AdminPanel() {
   const [stats, setStats] = useState({ total: 0, dinero: 0 });
   const [dataGrafica, setDataGrafica] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    // Si no hay usuario o el email no es el del jefe, fuera
+    if (!user || user.email !== "tu-email@gmail.com") {
+      navigate('/');
+    }
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -54,6 +65,7 @@ function AdminPanel() {
           Acceso Restringido
         </div>
       </header>
+      
       
       {/* KPIs Rápidos */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -113,5 +125,19 @@ function StatCard({ icon, title, label, color }) {
     </div>
   );
 }
+
+const [ideaSorteo, setIdeaSorteo] = useState('');
+const [sorteoGenerado, setSorteoGenerado] = useState(null);
+
+const generarSorteoIA = async () => {
+  const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+  const prompt = `Crea un sorteo para un taller mecánico basado en esta idea: "${ideaSorteo}". 
+    Dame la respuesta en formato JSON con estos campos: titulo, descripcion, fechaFin.`;
+  
+  const result = await model.generateContent(prompt);
+  // Aquí parsearíamos el JSON y lo guardaríamos en Firebase
+  // Por ahora, solo mostramos la magia:
+  setSorteoGenerado(JSON.parse(result.response.text()));
+};
 
 export default AdminPanel;

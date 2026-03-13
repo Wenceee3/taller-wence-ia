@@ -1,6 +1,10 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore"; // Importante para la DB
 import { getAuth } from "firebase/auth";           // Importante para Roles
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+
+export const googleProvider = new GoogleAuthProvider();
+export { signInWithPopup };
 
 const firebaseConfig = {
   apiKey: "AIzaSyCED5iY5wOfdxFZBpoefDY9V8x_yACtM3o",

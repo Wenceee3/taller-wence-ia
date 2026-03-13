@@ -9,32 +9,60 @@ import ContactoIA from './components/ContactoIA';
 import { Wrench, Home as HomeIcon, ShoppingBag, Gift, MessageSquare, Lock } from 'lucide-react';
 
 function App() {
+  const [usuario, setUsuario] = useState(null);
+
+  useEffect(() => {
+    // Escucha si el usuario entra o sale
+    const desubscribir = onAuthStateChanged(auth, (user) => {
+      setUsuario(user);
+    });
+    return () => desubscribir();
+  }, []);
+
+  const cerrarSesion = () => signOut(auth);
+
   return (
     <Router>
       <div className="min-h-screen bg-[#0f172a] text-white">
-        {/* NAVBAR GLOBAL */}
         <nav className="bg-slate-900/80 backdrop-blur-md border-b border-slate-700 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
             <div className="flex items-center gap-2 font-bold text-xl">
-              <Wrench className="text-sky-400" />
+              <span className="text-sky-400">🛠️</span>
               <span>Taller Wence</span>
             </div>
             
-            <div className="hidden md:flex gap-8 text-sm font-medium">
-              <Link to="/" className="hover:text-sky-400 flex items-center gap-1"><HomeIcon size={16}/> Inicio</Link>
-              <Link to="/tienda" className="hover:text-sky-400 flex items-center gap-1"><ShoppingBag size={16}/> Tienda</Link>
-              <Link to="/sorteos" className="hover:text-sky-400 flex items-center gap-1"><Gift size={16}/> Sorteos</Link>
-              <Link to="/contacto" className="hover:text-sky-400 flex items-center gap-1"><MessageSquare size={16}/> IA Chat</Link>
-              <Link to="/admin" className="text-slate-400 hover:text-red-400 flex items-center gap-1"><Lock size={16}/> Admin</Link>
+            <div className="hidden md:flex gap-8 text-sm font-medium items-center">
+              <Link to="/" className="hover:text-sky-400">Inicio</Link>
+              <Link to="/tienda" className="hover:text-sky-400">Tienda</Link>
+              <Link to="/sorteos" className="hover:text-sky-400">Sorteos</Link>
+              <Link to="/contacto" className="hover:text-sky-400">IA Chat</Link>
+              
+              {/* Solo mostrar Admin si el correo es el tuyo (Sustituye por tu email) */}
+              {usuario?.email === "tu-email@gmail.com" && (
+                <Link to="/admin" className="text-red-400 hover:text-red-300 font-bold">Admin</Link>
+              )}
             </div>
 
-            <Link to="/login" className="bg-sky-600 hover:bg-sky-500 px-5 py-2 rounded-full text-sm font-bold transition-all">
-              Entrar
-            </Link>
+            <div className="flex items-center gap-4">
+              {usuario ? (
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-400 hidden lg:block">{usuario.email}</span>
+                  <button 
+                    onClick={cerrarSesion}
+                    className="bg-slate-700 hover:bg-red-600 px-4 py-2 rounded-lg text-sm transition-all"
+                  >
+                    Salir
+                  </button>
+                </div>
+              ) : (
+                <Link to="/login" className="bg-sky-600 hover:bg-sky-500 px-6 py-2 rounded-lg text-sm font-bold">
+                  Entrar
+                </Link>
+              )}
+            </div>
           </div>
         </nav>
 
-        {/* CONTENIDO DE LAS PÁGINAS */}
         <div className="max-w-7xl mx-auto p-6">
           <Routes>
             <Route path="/" element={<Home />} />
