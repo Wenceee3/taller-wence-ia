@@ -9,7 +9,7 @@ const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_KEY);
 function ContactoIA({ stats }) {
   const [mensaje, setMensaje] = useState('');
   const [chat, setChat] = useState([
-    { role: 'bot', text: '¡Hola! Soy el asistente del Taller Wence. ¿En qué puedo ayudarte hoy?' }
+    { role: 'bot', text: '¡Hola! Soy el asistente del Taller Hermanos Torrebejano. ¿En qué puedo ayudarte hoy?' }
   ]);
   const [cargando, setCargando] = useState(false);
   const scrollRef = useRef(null);
@@ -30,7 +30,7 @@ function ContactoIA({ stats }) {
 
     try {
       const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
-      const prompt = `Eres el asistente del Taller Wence. Datos taller: ${stats.total} trabajos, ${stats.dinero}€ facturados. El usuario dice: ${mensaje}. Responde corto y amable.`;
+      const prompt = `Eres el asistente del Taller Hermanos Torrebejano. Datos taller: ${stats.total} trabajos, ${stats.dinero}€ facturados. El usuario dice: ${mensaje}. Responde corto y amable.`;
 
       const result = await model.generateContent(prompt);
       const respuestaIA = result.response.text();

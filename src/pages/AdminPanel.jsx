@@ -14,7 +14,7 @@ const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_KEY);
 function AdminPanel() {
   const [stats, setStats] = useState({ total: 0, dinero: 0 });
   const [dataGrafica, setDataGrafica] = useState([]);
-  const [pedidosAdmin, setPedidosAdmin] = useState([]); // ESTADO QUE FALTABA
+  const [pedidosAdmin, setPedidosAdmin] = useState([]);
   const [loading, setLoading] = useState(true);
   const [ideaSorteo, setIdeaSorteo] = useState('');
   const [creandoSorteo, setCreandoSorteo] = useState(false);
