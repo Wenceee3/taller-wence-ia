@@ -1,161 +1,163 @@
-import React, { useState } from 'react';
-import { ShoppingCart, Tag, Trash2, PackageCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShoppingCart, Package, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import React, { useState, useEffect } from 'react';
-
-const PRODUCTOS = [
-  { id: 1, nombre: "Aceite Sintético 5W30", precio: 45.00, img: "https://images.unsplash.com/photo-1635843104392-4fce1090333d?q=80&w=400&auto=format&fit=crop" },
-  { id: 2, nombre: "Pastillas de Freno (Juego)", precio: 85.50, img: "https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?q=80&w=400&auto=format&fit=crop" },
-  { id: 3, nombre: "Batería 75Ah", precio: 120.00, img: "https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?q=80&w=400&auto=format&fit=crop" },
-  { id: 4, nombre: "Escobillas Limpia (Par)", precio: 25.00, img: "https://images.unsplash.com/photo-1598209279122-8541213a0387?q=80&w=400&auto=format&fit=crop" }
-];
 
 function Tienda() {
   const [productos, setProductos] = useState([]);
+  const [carrito, setCarrito] = useState([]);
   const [cargando, setCargando] = useState(true);
 
+  // 1. Cargar productos desde LARAVEL
   useEffect(() => {
-    // Llamada a tu microservicio Laravel en el puerto 8000
-    fetch('http://localhost:8000/api/productos')
-      .then(res => res.json())
-      .then(data => {
+    const cargarProductos = async () => {
+      try {
+        const res = await fetch('http://localhost:8000/api/productos');
+        const data = await res.json();
         setProductos(data);
         setCargando(false);
-      })
-      .catch(err => {
-        console.error("Error cargando stock de Laravel:", err);
+      } catch (err) {
+        console.error("Error cargando de Laravel:", err);
+        toast.error("Servidor Laravel offline");
         setCargando(false);
-      });
+      }
+    };
+    cargarProductos();
   }, []);
 
-  const agregarAlCarrito = (producto) => {
-    setCarrito([...carrito, producto]);
-    toast.success(`${producto.nombre} añadido`, { style: { borderRadius: '10px', background: '#1e293b', color: '#fff' } });
+  const agregarAlCarrito = (prod) => {
+    if (prod.stock <= 0) return toast.error("Sin stock disponible");
+    setCarrito([...carrito, prod]);
+    toast.success(`${prod.nombre} añadido al carrito`);
   };
 
-  const eliminarDelCarrito = (index) => {
-    const nuevoCarrito = carrito.filter((_, i) => i !== index);
-    setCarrito(nuevoCarrito);
+  // 2. LÓGICA DE COMPRA HÍBRIDA (Firebase + Laravel)
+  const finalizarCompra = async () => {
+    if (!auth.currentUser) return toast.error("Debes iniciar sesión para comprar");
+    if (carrito.length === 0) return;
+
+    try {
+      // A. Guardar pedido en FIREBASE
+      await addDoc(collection(db, "pedidos"), {
+        clienteEmail: auth.currentUser.email,
+        items: carrito,
+        total: carrito.reduce((sum, i) => sum + parseFloat(i.precio), 0),
+        fecha: serverTimestamp(),
+        estado: 'Pagado'
+      });
+
+      // B. Restar stock en LARAVEL
+      await fetch('http://localhost:8000/api/productos/comprar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: carrito })
+      });
+
+      // C. Actualizar UI localmente
+      const nuevosProductos = productos.map(p => {
+        const cantidadComprada = carrito.filter(item => item.id === p.id).length;
+        return { ...p, stock: p.stock - cantidadComprada };
+      });
+      setProductos(nuevosProductos);
+
+      setCarrito([]);
+      toast.success("¡Compra realizada con éxito!");
+    } catch (e) {
+      console.error(e);
+      toast.error("Error en el proceso de compra");
+    }
   };
 
-  const confirmarPedido = async () => {
-  const user = auth.currentUser;
-  if (!user) {
-    toast.error("Debes iniciar sesión para comprar");
-    return;
-  }
-
-  try {
-    await addDoc(collection(db, "pedidos"), {
-      clienteEmail: user.email,
-      items: carrito,
-      total: total,
-      estado: "Pendiente",
-      fecha: serverTimestamp()
-    });
-
-    toast.success("¡Pedido realizado! Pásate por el taller a por él", { icon: '📦' });
-    setCarrito([]);
-    setMostrarCarrito(false);
-  } catch (e) {
-    toast.error("Error al procesar el pedido");
-  }
-};
-
-
-  const total = carrito.reduce((acc, p) => acc + p.precio, 0);
+  if (cargando) return (
+    <div className="flex flex-col items-center justify-center p-20 space-y-4">
+      <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+      <p className="text-sky-400 font-bold animate-pulse uppercase tracking-widest text-xs">Conectando con Almacén Laravel...</p>
+    </div>
+  );
 
   return (
-    <div className="py-10 relative">
-      <div className="flex justify-between items-center mb-10">
-        <div>
-          <h2 className="text-4xl font-bold flex items-center gap-3 text-white">
-            <ShoppingCart className="text-sky-400" /> Tienda Wence
-          </h2>
-          <p className="text-slate-400">Recambios originales para tu vehículo.</p>
-        </div>
-        
-        {/* Botón Carrito */}
-        <button 
-          onClick={() => setMostrarCarrito(!mostrarCarrito)}
-          className="bg-sky-600 p-4 rounded-2xl flex items-center gap-3 font-bold hover:bg-sky-500 transition-all relative shadow-lg shadow-sky-500/20"
-        >
-          <ShoppingCart size={24} />
-          <span>{carrito.length} ítems</span>
-          {carrito.length > 0 && <span className="absolute -top-2 -right-2 bg-red-500 w-6 h-6 rounded-full flex items-center justify-center text-xs">!</span>}
-        </button>
-      </div>
-
-      {/* Grid de Productos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {PRODUCTOS.map((p) => (
-          <div key={p.id} className="bg-slate-800/50 rounded-3xl border border-slate-700 overflow-hidden hover:border-sky-500/50 transition-all group">
-            <div className="h-40 overflow-hidden">
-              <img src={p.img} alt={p.nombre} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 pb-20">
+      
+      {/* Listado de Productos */}
+      <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
+        {productos.map((prod) => (
+          <div key={prod.id} className="bg-slate-800/40 backdrop-blur-md border border-white/5 rounded-3xl overflow-hidden hover:border-sky-500/50 transition-all group shadow-2xl">
+            <div className="h-48 overflow-hidden relative">
+              <img 
+                src={prod.imagen || 'https://via.placeholder.com/400x300?text=Taller+Wence'} 
+                alt={prod.nombre} 
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+              />
+              <div className={`absolute top-4 right-4 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase border ${
+                prod.stock < 5 ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-slate-900/80 text-sky-400 border-sky-500/20'
+              }`}>
+                Stock: {prod.stock}
+              </div>
             </div>
-            <div className="p-5">
-              <h3 className="font-bold text-lg mb-1">{p.nombre}</h3>
-              <p className="text-sky-400 font-bold text-xl mb-4">{p.precio.toFixed(2)} €</p>
-              <button 
-                onClick={() => agregarAlCarrito(p)}
-                className="w-full bg-slate-700 hover:bg-sky-600 py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 text-sm"
-              >
-                <Tag size={16} /> Añadir al carrito
-              </button>
+            
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-white mb-2 leading-tight">{prod.nombre}</h3>
+              <div className="flex justify-between items-center mt-4">
+                <span className="text-2xl font-black text-emerald-400">{parseFloat(prod.precio).toFixed(2)}€</span>
+                <button 
+                  onClick={() => agregarAlCarrito(prod)}
+                  disabled={prod.stock <= 0}
+                  className={`p-3 rounded-2xl transition-all active:scale-90 ${
+                    prod.stock <= 0 ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/20'
+                  }`}
+                >
+                  <ShoppingCart size={20} />
+                </button>
+              </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Modal del Carrito Lateral */}
-      {mostrarCarrito && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-end">
-          <div className="w-full max-w-md bg-slate-900 h-full p-8 shadow-2xl border-l border-slate-700 animate-in slide-in-from-right">
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-bold">Tu Pedido</h2>
-              <button onClick={() => setMostrarCarrito(false)} className="text-slate-400 hover:text-white text-2xl">×</button>
-            </div>
+      {/* Carrito Lateral */}
+      <div className="lg:col-span-1">
+        <div className="bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sticky top-24 shadow-2xl">
+          <h2 className="text-xl font-black mb-6 flex items-center gap-2 italic uppercase tracking-tighter">
+            <ShoppingCart className="text-sky-400" size={24} /> Mi Pedido
+          </h2>
+          
+          <div className="space-y-3 mb-6 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+            {carrito.length === 0 ? (
+              <div className="text-center py-12">
+                <Package className="mx-auto text-slate-700 mb-2" size={40} />
+                <p className="text-slate-500 italic text-xs">Carrito vacío</p>
+              </div>
+            ) : (
+              carrito.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-center bg-white/5 p-3 rounded-2xl border border-white/5 animate-in fade-in slide-in-from-right-4">
+                  <span className="text-[11px] font-bold truncate max-w-[120px] uppercase">{item.nombre}</span>
+                  <span className="text-xs font-black text-emerald-400">{item.precio}€</span>
+                </div>
+              ))
+            )}
+          </div>
 
-            <div className="space-y-4 h-[60vh] overflow-y-auto pr-2">
-              {carrito.length === 0 ? (
-                <p className="text-slate-500 italic text-center mt-20">El carrito está vacío</p>
-              ) : (
-                carrito.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                    <div>
-                      <p className="font-bold text-sm">{item.nombre}</p>
-                      <p className="text-sky-400 text-xs">{item.precio} €</p>
-                    </div>
-                    <button onClick={() => eliminarDelCarrito(index)} className="text-red-400 hover:bg-red-400/10 p-2 rounded-lg">
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="absolute bottom-10 left-8 right-8 space-y-4">
-              <div className="flex justify-between items-center border-t border-slate-700 pt-4">
-                <span className="text-xl font-bold">Total:</span>
-                <span className="text-2xl font-bold text-sky-400">{total.toFixed(2)} €</span>
+          {carrito.length > 0 && (
+            <div className="border-t border-white/10 pt-5">
+              <div className="flex justify-between items-center mb-6">
+                <span className="text-slate-500 font-black uppercase text-[10px] tracking-widest">Total</span>
+                <span className="text-3xl font-black text-white italic">
+                  {carrito.reduce((sum, i) => sum + parseFloat(i.precio), 0).toFixed(2)}€
+                </span>
               </div>
               <button 
-    onClick={confirmarPedido} // Aquí llamamos a la función real de Firebase
-    disabled={carrito.length === 0}
-    className="w-full bg-sky-600 hover:bg-sky-500 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-95 shadow-lg shadow-sky-600/20"
-  >
-    <PackageCheck size={20}/> Confirmar y Recoger en Taller
-  </button>
+                onClick={finalizarCompra}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 py-4 rounded-2xl font-black uppercase text-xs tracking-[0.2em] transition-all shadow-xl shadow-emerald-600/20 active:scale-95 text-white"
+              >
+                Confirmar Compra
+              </button>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
-
-
 
 export default Tienda;
