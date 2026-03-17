@@ -3,6 +3,7 @@ import { ShoppingCart, Tag, Trash2, PackageCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
 
 const PRODUCTOS = [
   { id: 1, nombre: "Aceite Sintético 5W30", precio: 45.00, img: "https://images.unsplash.com/photo-1635843104392-4fce1090333d?q=80&w=400&auto=format&fit=crop" },
@@ -12,8 +13,22 @@ const PRODUCTOS = [
 ];
 
 function Tienda() {
-  const [carrito, setCarrito] = useState([]);
-  const [mostrarCarrito, setMostrarCarrito] = useState(false);
+  const [productos, setProductos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    // Llamada a tu microservicio Laravel en el puerto 8000
+    fetch('http://localhost:8000/api/productos')
+      .then(res => res.json())
+      .then(data => {
+        setProductos(data);
+        setCargando(false);
+      })
+      .catch(err => {
+        console.error("Error cargando stock de Laravel:", err);
+        setCargando(false);
+      });
+  }, []);
 
   const agregarAlCarrito = (producto) => {
     setCarrito([...carrito, producto]);
